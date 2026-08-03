@@ -20,6 +20,10 @@
 <p>የእቃ ባለቤቶች መመዝገቢያ</p>
 </header>
 
+<!-- ⬅️ Back በተን (ወደ ዋናው ገጽ ለመመለስ) -->
+<div>
+<a href="index.html" class="back-btn">⬅️ Back</a>
+</div>
 
 <div class="card">
 
@@ -27,7 +31,8 @@
 
 <input id="ownerPhone" placeholder="ስልክ ቁጥር">
 
-<button onclick="addOwner()">
+<!-- በተኑን ሲነኩ ፓስወርድ ይጠይቃል -->
+<button onclick="checkPasswordAndAdd()">
 ➕ Add Owner
 </button>
 
@@ -48,19 +53,27 @@
 <script>
 
 const db = firebase.database();
+const ADMIN_PASSWORD = "aman"; // እዚህ ጋር የሚፈልጉትን የራስዎን ፓስወርድ ማድረግ ይችላሉ
 
+// 🔐 አድሚን ፓስወርድ ማረጋገጫ
+function checkPasswordAndAdd() {
+    let pass = prompt("🔐 ባለቤት ለመመዝገብ የአድሚን ፓስወርድ ያስገቡ፦");
+    if (pass === ADMIN_PASSWORD) {
+        addOwner();
+    } else if (pass !== null) {
+        alert("❌ የተሳሳተ ፓስወርድ!");
+    }
+}
 
 function addOwner(){
 
 let name = document.getElementById("ownerName").value;
 let phone = document.getElementById("ownerPhone").value;
 
-
 if(name==""){
 alert("ስም ያስገቡ");
 return;
 }
-
 
 db.ref("owners").push({
 
@@ -69,18 +82,15 @@ phone:phone
 
 });
 
-
 document.getElementById("ownerName").value="";
 document.getElementById("ownerPhone").value="";
+alert("✅ ባለቤቱ በተሳካ ሁኔታ ተመዝግቧል!");
 
 }
-
-
 
 db.ref("owners").on("value",(snapshot)=>{
 
 let list="";
-
 
 snapshot.forEach((item)=>{
 
@@ -94,15 +104,11 @@ ${data.name} - ${data.phone}
 
 });
 
-
 document.getElementById("ownerList").innerHTML=list;
-
 
 });
 
-
 </script>
-
 
 </body>
 </html>
