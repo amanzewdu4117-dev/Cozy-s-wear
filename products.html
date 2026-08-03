@@ -13,20 +13,23 @@
 
 <header>
 <h1>📦 Products</h1>
-<p>የሚሸጡ እቃዎች መመዝገቢያ</p>
+<p>የእቃዎች አስተዳደር እና መመዝገቢያ</p>
 </header>
 
+<!-- እቃ መመዝገቢያ (በተኑ ሲነካ ፓስወርድ ይጠይቃል) -->
 <div class="card">
-<input id="productName" placeholder="የእቃ ስም">
+<h3>አዲስ እቃ መመዝገቢያ</h3>
+<select id="productOwner">
+<option value="">-- ባለቤት ይምረጡ --</option>
+</select>
+<input id="productName" placeholder="የእቃው ስም (ምሳሌ፦ ጃኬት)">
 <input id="productPrice" placeholder="የአንዱ እቃ ዋጋ (ETB)" type="number">
-<input id="productOwner" placeholder="የባለቤት ስም">
-<input id="productStock" placeholder="የእቃ ብዛት" type="number">
-<input id="productImage" placeholder="የምስል URL">
-<button onclick="addProduct()">➕ Add Product</button>
+<input id="productStock" placeholder="ብዛት (Quantity)" type="number">
+<button onclick="checkPasswordAndAdd()">➕ Add Product</button>
 </div>
 
 <div class="card">
-<h2>Products List (የእቃዎች ዝርዝር)</h2>
+<h2>የእቃዎች ዝርዝር (Products List)</h2>
 <ul id="productList"></ul>
 </div>
 
@@ -34,90 +37,104 @@
 
 <script>
 const db = firebase.database();
+const ADMIN_PASSWORD = "aman"; // እዚህ ጋር የአድሚን ፓስወርድዎን መቀየር ይችላሉ
 
-function addProduct(){
-    let name = document.getElementById("productName").value;
-    let price = Number(document.getElementById("productPrice").value);
+// ባለቤቶችን (Owners) ከፋየርቤስ አምጥቶ በ Dropdown ውስጥ መሙላት
+db.ref("owners").on("value", (snapshot) => {
+    let options = '<option value="">-- ባለቤት ይምረጡ --</option>';
+    snapshot.forEach((item) => {
+        let data = item.val();
+        options += `<option value="${data.name}">${data.name}</option>`;
+    });
+    document.getElementById("productOwner").innerHTML = options;
+});
+
+// 🔐 አድሚን ፓስወርድ ማረጋገጫ ለ Add Product
+function checkPasswordAndAdd() {
+    let pass = prompt("🔐 እቃ ለመመዝገብ የአድሚን ፓስወርድ ያስገቡ፦");
+    if (pass === ADMIN_PASSWORD) {
+        addProduct();
+    } else if (pass !== null) {
+        alert("❌ የተሳሳተ ፓስወርድ!");
+    }
+}
+
+function addProduct() {
     let owner = document.getElementById("productOwner").value;
-    let stock = Number(document.getElementById("productStock").value);
-    let image = document.getElementById("productImage").value;
+    let name = document.getElementById("productName").value;
+    let price = document.getElementById("productPrice").value;
+    let stock = document.getElementById("productStock").value;
 
-    if(name==""){
-        alert("የእቃ ስም ያስገቡ");
+    if (owner == "") {
+        alert("እባክዎ ባለቤት ይምረጡ");
         return;
     }
-    if(isNaN(price) || price <= 0){
+    if (name == "") {
+        alert("እባክዎ የእቃውን ስም ያስገቡ");
+        return;
+    }
+    if (price == "" || Number(price) <= 0) {
         alert("እባክዎ ትክክለኛ ዋጋ ያስገቡ");
         return;
     }
-    if(isNaN(stock) || stock <= 0){
-        alert("እባክዎ ትክክለኛ የእቃ ብዛት ያስገቡ");
+    if (stock == "" || Number(stock) <= 0) {
+        alert("እባክዎ ትክክለኛ ብዛት (Quantity) ያስገቡ");
         return;
     }
 
-    // አጠቃላይ ዋጋን ማስላት (የአንዱ ዋጋ * ብዛት)
-    let totalPrice = price * stock;
-
     db.ref("products").push({
-        name: name,
-        price: price,           // የአንዱ ዋጋ
-        totalPrice: totalPrice, // አጠቃላይ ዋጋ
         owner: owner,
-        stock: stock,
-        image: image,
-        status: stock > 0 ? "available" : "sold"
+        name: name,
+        price: Number(price),
+        stock: Number(stock),
+        date: new Date().toLocaleString()
     });
 
-    document.getElementById("productName").value="";
-    document.getElementById("productPrice").value="";
-    document.getElementById("productOwner").value="";
-    document.getElementById("productStock").value="";
-    document.getElementById("productImage").value="";
-    alert("እቃው በተሳካ ሁኔታ ተመዝግቧል!");
+    document.getElementById("productName").value = "";
+    document.getElementById("productPrice").value = "";
+    document.getElementById("productStock").value = "";
+    alert("✅ እቃው በተሳካ ሁኔታ ተመዝግቧል!");
 }
 
-// እቃውን ሙሉ በሙሉ ከዴታቤዝ የማጥፊያ ተግባር
-function deleteProduct(productId){
-    if(confirm("ይህንን እቃ ከዴታቤዝ ውስጥ ሙሉ በሙሉ ማጥፋት (Delete ማድረግ) ትፈልጋለህ?")){
-        db.ref("products/" + productId).remove()
-        .then(() => {
-            alert("እቃው በተሳካ ሁኔታ ተሰርዟል!");
-        })
-        .catch((error) => {
+// 🔐 አድሚን ፓስወርድ ማረጋገጫ ለ Delete Product
+function checkPasswordAndDelete(productId) {
+    let pass = prompt("🔐 ይህንን እቃ ለማጥፋት የአድሚን ፓስወርድ ያስገቡ፦");
+    if (pass === ADMIN_PASSWORD) {
+        deleteProduct(productId);
+    } else if (pass !== null) {
+        alert("❌ የተሳሳተ ፓስወርድ!");
+    }
+}
+
+function deleteProduct(productId) {
+    if (confirm("ይህንን እቃ ከዝርዝሩ ማጥፋት (Delete ማድረግ) እርግጠኛ ነዎት?")) {
+        db.ref("products/" + productId).remove().then(() => {
+            alert("እቃው ተሰርዟል!");
+        }).catch((error) => {
             alert("ስህተት ተፈጥሯል: " + error.message);
         });
     }
 }
 
-// የእቃዎች ዝርዝር የአንዱን እና አጠቃላይ ዋጋን ጨምሮ ማሳየት
-db.ref("products").on("value",(snapshot)=>{
-    let list="";
+// የእቃዎች ዝርዝር ማሳያ (ከነ Delete በተን ጋር)
+db.ref("products").on("value", (snapshot) => {
+    let listHTML = "";
 
-    snapshot.forEach((item)=>{
-        let data=item.val();
+    snapshot.forEach((item) => {
         let productId = item.key;
-        let stockCount = Number(data.stock || 0);
-        let unitPrice = Number(data.price || 0);
-        // አጠቃላይ ዋጋ ከቀድሞው ዳታ ጋር እንዲጣጣም (ካልተቀመጠም በራሱ እንዲያሰላው)
-        let totPrice = data.totalPrice ? Number(data.totalPrice) : (unitPrice * stockCount);
-        
-        let statusBadge = stockCount > 0 
-            ? `<span style="color: green; font-weight: bold;">Available (ቀሪ - ${stockCount}) ✅</span>` 
-            : `<span style="color: red; font-weight: bold;">Sold Out (ተሸጧል) ❌</span>`;
+        let data = item.val();
 
-        list += `
-            <li>
-                📦 <b>${data.name}</b><br>
-                💰 የአንዱ ዋጋ: ${unitPrice} ETB<br>
-                💵 አጠቃላይ ዋጋ (${stockCount} pcs): <b>${totPrice} ETB</b><br>
-                👤 ባለቤት: ${data.owner}<br>
-                📌 ሁኔታ: ${statusBadge}<br>
-                <button onclick="deleteProduct('${productId}')" style="background-color: #d9534f; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; margin-top: 5px;">🗑️ Delete Product</button>
+        listHTML += `
+            <li style="margin-bottom: 10px;">
+                👤 ባለቤት: <b>${data.owner}</b><br>
+                📦 እቃ: <b>${data.name}</b> | ዋጋ: <b>${data.price} ETB</b> | ቀሪ ብዛት: <b>${data.stock}</b><br>
+                <small style="color:gray;">${data.date || ''}</small><br>
+                <button onclick="checkPasswordAndDelete('${productId}')" style="background-color: #d9534f; color: white; padding: 2px 6px; border: none; border-radius: 3px; cursor: pointer; font-size: 12px; margin-top: 4px;">🗑️ Delete</button>
             </li><hr>
         `;
     });
 
-    document.getElementById("productList").innerHTML=list;
+    document.getElementById("productList").innerHTML = listHTML || "<li>ምንም የተመዘገበ እቃ የለም</li>";
 });
 </script>
 
