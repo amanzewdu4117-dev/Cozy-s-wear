@@ -1,17 +1,9 @@
 {
-  "name": "Cozy's Wear",
-  "short_name": "Cozy Wear",
-  "description": "Cozy's Wear clothing sales, inventory, and payment management system.",
+  "name": "Cozy Swear",
+  "short_name": "Cozy Swear",
+  "description": "Cozy Swear clothing sales, inventory, and payment management system.",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#f5f5f5",
-  "theme_color": "#8b4513",
-  "icons": [
-    {
-      "src": "icon.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
-    }
-  ]
+  "theme_color": "#8b4513"
 }
