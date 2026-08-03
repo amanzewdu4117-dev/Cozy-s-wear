@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="am">
+
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Reports - Cozy's Wear</title>
+
+<link rel="stylesheet" href="style.css">
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+
+</head>
+
+
+<body>
+
+
+<header>
+<h1>📊 Reports</h1>
+<p>የሽያጭ እና ገቢ ሪፖርት</p>
+</header>
+
+
+
+<div class="dashboard">
+
+
+<div class="card">
+
+<h2>📦 Products</h2>
+
+<h1 id="totalProducts">0</h1>
+
+</div>
+
+
+
+<div class="card">
+
+<h2>🛒 Sales</h2>
+
+<h1 id="totalSales">0</h1>
+
+</div>
+
+
+
+<div class="card">
+
+<h2>💰 Revenue</h2>
+
+<h1 id="totalRevenue">0 ETB</h1>
+
+</div>
+
+
+
+</div>
+
+
+
+<script src="firebase.js"></script>
+
+
+<script>
+
+
+const db = firebase.database();
+
+
+
+// Products count
+
+db.ref("products").on("value",(snapshot)=>{
+
+document.getElementById("totalProducts").innerHTML =
+snapshot.numChildren();
+
+});
+
+
+
+
+
+// Sales & Revenue
+
+db.ref("sales").on("value",(snapshot)=>{
+
+
+let sales = 0;
+let revenue = 0;
+
+
+snapshot.forEach((item)=>{
+
+
+let data=item.val();
+
+
+sales++;
+
+revenue += Number(data.price);
+
+
+});
+
+
+
+document.getElementById("totalSales").innerHTML=sales;
+
+
+document.getElementById("totalRevenue").innerHTML=
+revenue+" ETB";
+
+
+
+});
+
+
+
+</script>
+
+
+</body>
+
+</html>

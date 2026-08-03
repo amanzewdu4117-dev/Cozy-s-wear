@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="am">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Products - Cozy's Wear</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+</head>
+
+<body>
+
+<header>
+<h1>📦 Products</h1>
+<p>የሚሸጡ እቃዎች መመዝገቢያ</p>
+</header>
+
+<div class="card">
+<input id="productName" placeholder="የእቃ ስም">
+<input id="productPrice" placeholder="የአንዱ እቃ ዋጋ (ETB)" type="number">
+<input id="productOwner" placeholder="የባለቤት ስም">
+<input id="productStock" placeholder="የእቃ ብዛት" type="number">
+<input id="productImage" placeholder="የምስል URL">
+<button onclick="addProduct()">➕ Add Product</button>
+</div>
+
+<div class="card">
+<h2>Products List (የእቃዎች ዝርዝር)</h2>
+<ul id="productList"></ul>
+</div>
+
+<script src="firebase.js"></script>
+
+<script>
+const db = firebase.database();
+
+function addProduct(){
+    let name = document.getElementById("productName").value;
+    let price = Number(document.getElementById("productPrice").value);
+    let owner = document.getElementById("productOwner").value;
+    let stock = Number(document.getElementById("productStock").value);
+    let image = document.getElementById("productImage").value;
+
+    if(name==""){
+        alert("የእቃ ስም ያስገቡ");
+        return;
+    }
+    if(isNaN(price) || price <= 0){
+        alert("እባክዎ ትክክለኛ ዋጋ ያስገቡ");
+        return;
+    }
+    if(isNaN(stock) || stock <= 0){
+        alert("እባክዎ ትክክለኛ የእቃ ብዛት ያስገቡ");
+        return;
+    }
+
+    // አጠቃላይ ዋጋን ማስላት (የአንዱ ዋጋ * ብዛት)
+    let totalPrice = price * stock;
+
+    db.ref("products").push({
+        name: name,
+        price: price,           // የአንዱ ዋጋ
+        totalPrice: totalPrice, // አጠቃላይ ዋጋ
+        owner: owner,
+        stock: stock,
+        image: image,
+        status: stock > 0 ? "available" : "sold"
+    });
+
+    document.getElementById("productName").value="";
+    document.getElementById("productPrice").value="";
+    document.getElementById("productOwner").value="";
+    document.getElementById("productStock").value="";
+    document.getElementById("productImage").value="";
+    alert("እቃው በተሳካ ሁኔታ ተመዝግቧል!");
+}
+
+// እቃውን ሙሉ በሙሉ ከዴታቤዝ የማጥፊያ ተግባር
+function deleteProduct(productId){
+    if(confirm("ይህንን እቃ ከዴታቤዝ ውስጥ ሙሉ በሙሉ ማጥፋት (Delete ማድረግ) ትፈልጋለህ?")){
+        db.ref("products/" + productId).remove()
+        .then(() => {
+            alert("እቃው በተሳካ ሁኔታ ተሰርዟል!");
+        })
+        .catch((error) => {
+            alert("ስህተት ተፈጥሯል: " + error.message);
+        });
+    }
+}
+
+// የእቃዎች ዝርዝር የአንዱን እና አጠቃላይ ዋጋን ጨምሮ ማሳየት
+db.ref("products").on("value",(snapshot)=>{
+    let list="";
+
+    snapshot.forEach((item)=>{
+        let data=item.val();
+        let productId = item.key;
+        let stockCount = Number(data.stock || 0);
+        let unitPrice = Number(data.price || 0);
+        // አጠቃላይ ዋጋ ከቀድሞው ዳታ ጋር እንዲጣጣም (ካልተቀመጠም በራሱ እንዲያሰላው)
+        let totPrice = data.totalPrice ? Number(data.totalPrice) : (unitPrice * stockCount);
+        
+        let statusBadge = stockCount > 0 
+            ? `<span style="color: green; font-weight: bold;">Available (ቀሪ - ${stockCount}) ✅</span>` 
+            : `<span style="color: red; font-weight: bold;">Sold Out (ተሸጧል) ❌</span>`;
+
+        list += `
+            <li>
+                📦 <b>${data.name}</b><br>
+                💰 የአንዱ ዋጋ: ${unitPrice} ETB<br>
+                💵 አጠቃላይ ዋጋ (${stockCount} pcs): <b>${totPrice} ETB</b><br>
+                👤 ባለቤት: ${data.owner}<br>
+                📌 ሁኔታ: ${statusBadge}<br>
+                <button onclick="deleteProduct('${productId}')" style="background-color: #d9534f; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; margin-top: 5px;">🗑️ Delete Product</button>
+            </li><hr>
+        `;
+    });
+
+    document.getElementById("productList").innerHTML=list;
+});
+</script>
+
+</body>
+</html>

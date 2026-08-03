@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="am">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Owners - Cozy's Wear</title>
+
+<link rel="stylesheet" href="style.css">
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+
+</head>
+
+<body>
+
+<header>
+<h1>👤 Owners</h1>
+<p>የእቃ ባለቤቶች መመዝገቢያ</p>
+</header>
+
+
+<div class="card">
+
+<input id="ownerName" placeholder="የባለቤት ስም">
+
+<input id="ownerPhone" placeholder="ስልክ ቁጥር">
+
+<button onclick="addOwner()">
+➕ Add Owner
+</button>
+
+</div>
+
+
+<div class="card">
+
+<h2>Owners List</h2>
+
+<ul id="ownerList"></ul>
+
+</div>
+
+
+<script src="firebase.js"></script>
+
+<script>
+
+const db = firebase.database();
+
+
+function addOwner(){
+
+let name = document.getElementById("ownerName").value;
+let phone = document.getElementById("ownerPhone").value;
+
+
+if(name==""){
+alert("ስም ያስገቡ");
+return;
+}
+
+
+db.ref("owners").push({
+
+name:name,
+phone:phone
+
+});
+
+
+document.getElementById("ownerName").value="";
+document.getElementById("ownerPhone").value="";
+
+}
+
+
+
+db.ref("owners").on("value",(snapshot)=>{
+
+let list="";
+
+
+snapshot.forEach((item)=>{
+
+let data=item.val();
+
+list += `
+<li>
+${data.name} - ${data.phone}
+</li>
+`;
+
+});
+
+
+document.getElementById("ownerList").innerHTML=list;
+
+
+});
+
+
+</script>
+
+
+</body>
+</html>

@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="am">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sales - Cozy's Wear</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+</head>
+
+<body>
+
+<header>
+<h1>🛒 Sales</h1>
+<p>የተሸጡ እቃዎች መመዝገቢያ</p>
+</header>
+
+<div class="card">
+<select id="saleProduct">
+<option value="">-- እቃ ይምረጡ --</option>
+</select>
+
+<input id="salePrice" placeholder="የሽያጭ ዋጋ ETB" type="number">
+<input id="buyerName" placeholder="የገዢ ስም">
+
+<button onclick="addSale()">➕ Add Sale</button>
+</div>
+
+<div class="card">
+<h2>Sales List (የሽያጭ ታሪክ)</h2>
+<ul id="salesList"></ul>
+</div>
+
+<script src="firebase.js"></script>
+
+<script>
+const db = firebase.database();
+
+// የሚገኙ እቃዎችን በ Select ሜኑ ማምጣት
+db.ref("products").on("value", (snapshot) => {
+    let options = '<option value="">-- እቃ ይምረጡ --</option>';
+
+    snapshot.forEach((item) => {
+        let data = item.val();
+        if (data.status !== "sold" && Number(data.stock || 0) > 0) {
+            options += `
+                <option value="${item.key}">
+                    ${data.name} (${data.stock} ቀርቷል) - ${data.price} ETB
+                </option>
+            `;
+        }
+    });
+
+    document.getElementById("saleProduct").innerHTML = options;
+});
+
+function addSale(){
+    let productId = document.getElementById("saleProduct").value;
+    let price = document.getElementById("salePrice").value;
+    let buyer = document.getElementById("buyerName").value;
+
+    if(productId == ""){
+        alert("እቃ ይምረጡ");
+        return;
+    }
+
+    db.ref("products/" + productId).once("value").then((snapshot)=>{
+        let product = snapshot.val();
+
+        if(!product){
+            alert("እቃው አልተገኘም");
+            return;
+        }
+
+        let stock = Number(product.stock || 0);
+
+        if(stock <= 0){
+            alert("ይህ እቃ አልቋል (Out of Stock)");
+            return;
+        }
+
+        let newStock = stock - 1;
+        let newStatus = newStock === 0 ? "sold" : "available";
+
+        // ስቶክ መቀነስ እና ስታተስ ማስተካከል
+        db.ref("products/" + productId).update({
+            stock: newStock,
+            status: newStatus
+        });
+
+        // ሽያጭ መዝግብ (የ product_id ን ጭምር መያዙ ሲሰረዝ ስቶኩን ለመመለስ ይጠቅማል)
+        db.ref("sales").push({
+            productId: productId,
+            product: product.name,
+            owner: product.owner,
+            price: Number(price || product.price),
+            quantity: 1,
+            total: Number(price || product.price) * 1,
+            buyer: buyer,
+            date: new Date().toLocaleString()
+        });
+
+        document.getElementById("saleProduct").value = "";
+        document.getElementById("salePrice").value = "";
+        document.getElementById("buyerName").value = "";
+
+        alert("Sale በተሳካ ሁኔታ ተመዝግቧል!");
+    });
+}
+
+// የሽያጭ ታሪክ ማጥፊያ እና ስቶክ መመለሻ ተግባር (Delete Sale Function)
+function deleteSale(saleId, productId, quantity){
+    if(confirm("ይህንን የሽያጭ ታሪክ ማጥፋት (Delete ማድረግ) ትፈልጋለህ? (የተቀነሰው ስቶክ ተመልሶ ይስተካከላል)")){
+        
+        // 1. ሽያጩን ከ sales ዴታቤዝ ማስወገድ
+        db.ref("sales/" + saleId).remove().then(() => {
+            
+            // 2. እቃው አሁንም products ውስጥ ካለ የነበረውን ስቶክ መመለስ
+            if(productId){
+                db.ref("products/" + productId).once("value").then((prodSnap) => {
+                    let prodData = prodSnap.val();
+                    if(prodData){
+                        let currentStock = Number(prodData.stock || 0);
+                        let restoredStock = currentStock + Number(quantity || 1);
+                        
+                        db.ref("products/" + productId).update({
+                            stock: restoredStock,
+                            status: "available"
+                        });
+                    }
+                });
+            }
+
+            alert("የሽያጭ ታሪኩ ተሰርዟል፣ ስቶኩም ተስተካክሏል!");
+        }).catch((error) => {
+            alert("ስህተት ተፈጥሯል: " + error.message);
+        });
+    }
+}
+
+// የሽያጭ ዝርዝር ከ Delete ቁልፍ ጋር ማሳየት
+db.ref("sales").on("value",(snapshot)=>{
+    let list = "";
+    snapshot.forEach((item)=>{
+        let saleId = item.key;
+        let data = item.val();
+        
+        list += `
+            <li>
+                🛒 <b>${data.product}</b> - ${data.price} ETB - ገዢ: ${data.buyer || 'نامعلوم'} <br>
+                <small style="color:gray;">ቀን: ${data.date || ''}</small><br>
+                <button onclick="deleteSale('${saleId}', '${data.productId || ''}', ${data.quantity || 1})" style="background-color: #d9534f; color: white; padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; margin-top: 5px;">🗑️ Delete Sale</button>
+            </li><hr>
+        `;
+    });
+    document.getElementById("salesList").innerHTML = list;
+});
+</script>
+
+</body>
+</html>

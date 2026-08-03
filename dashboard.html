@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="am">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vamos Bingo - Super AI Admin Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        body { background-color: #f4f6f9; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: none; }
+        .navbar-brand { font-weight: bold; letter-spacing: 1px; }
+        .card-stat { border: none; border-radius: 15px; transition: transform 0.2s; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        .card-stat:hover { transform: translateY(-5px); }
+        .table-container { background: white; border-radius: 15px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 25px; }
+        .ai-panel { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); color: white; border-radius: 15px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-bottom: 25px; }
+        .status-badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
+        .status-pending { background-color: #ffeeba; color: #856404; }
+    </style>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+</head>
+<body>
+    <nav class="navbar navbar-light bg-light px-4 mb-4">
+        <div class="container-fluid">
+            <a class="navbar-brand fw-bold">Vamos Bingo Admin</a>
+            <span class="navbar-text text-success" id="connection-status">
+                <i class="fa-solid fa-circle-dot me-1"></i> በመገናኘት ላይ...
+            </span>
+        </div>
+    </nav>
+
+    <div class="container-fluid">
+        <div class="row g-3 mb-4">
+            <div class="col-md-4">
+                <div class="card card-stat bg-primary text-white p-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-uppercase opacity-75">ጠቅላላ ተጫዋቾች</h6>
+                            <h2 class="fw-bold mb-0" id="stat-total-users">0</h2>
+                        </div>
+                        <i class="fa-solid fa-users fa-3x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card card-stat bg-success text-white p-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-uppercase opacity-75">አጠቃላይ ሲስተም ባላንስ</h6>
+                            <h2 class="fw-bold mb-0"><span id="stat-total-balance">0</span> ETB</h2>
+                        </div>
+                        <i class="fa-solid fa-wallet fa-3x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card card-stat bg-warning text-dark p-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-uppercase opacity-75">በካሽ ውስጥ ያሉ TIDs</h6>
+                            <h2 class="fw-bold mb-0" id="stat-total-tids">0</h2>
+                        </div>
+                        <i class="fa-solid fa-receipt fa-3x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4 mb-4">
+            <div class="col-md-5">
+                <div class="table-container" style="border-left: 5px solid #28a745;">
+                    <h5 class="fw-bold text-success mb-3"><i class="fa-solid fa-arrow-down-long me-2"></i> የሚጠባበቁ ዲፖዚቶች</h5>
+                    <div class="table-responsive" style="max-height: 300px;">
+                        <table class="table table-sm table-bordered align-middle">
+                            <thead class="table-success">
+                                <tr><th>ተጫዋች / ID</th><th>ባንክ</th><th>አካውንት</th><th>ብር</th><th class="text-center">ድርጊት</th></tr>
+                            </thead>
+                            <tbody id="deposit-requests-body">
+                                <tr><td colspan="5" class="text-center text-muted">የሚጠባበቅ የለም</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-7">
+                <div class="table-container" style="border-left: 5px solid #dc3545;">
+                    <h5 class="fw-bold text-danger mb-3"><i class="fa-solid fa-arrow-up-long me-2"></i> የሚጠባበቁ ዊዝድሮዎች (Withdrawals)</h5>
+                    <div class="table-responsive" style="max-height: 300px;">
+                        <table class="table table-sm table-bordered align-middle" style="font-size: 13px;">
+                            <thead class="table-danger">
+                                <tr>
+                                    <th>ተጫዋች</th>
+                                    <th>ባንክ</th>
+                                    <th>አካውንት ቁጥር</th>
+                                    <th>ባለቤት</th>
+                                    <th>ብር</th>
+                                    <th>ሁኔታ</th>
+                                    <th class="text-center">ድርጊት</th>
+                                </tr>
+                            </thead>
+                            <tbody id="withdraw-requests-body">
+                                <tr><td colspan="7" class="text-center text-muted">የሚጠባበቅ የለም</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            <div class="col-lg-8">
+                <div class="table-container">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="fw-bold text-secondary mb-0"><i class="fa-solid fa-users-gear me-2 text-primary"></i> የተጫዋቾች መቆጣጠሪያ</h5>
+                        <input type="text" id="user-search" class="form-control form-control-sm w-50" placeholder="ተጫዋች በስም ፈልግ...">
+                    </div>
+                    <div class="table-responsive" style="max-height: 350px;">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light sticky-top">
+                                <tr><th>ስም (ID)</th><th>ስልክ</th><th>ሒሳብ</th><th class="text-center">ድርጊት</th></tr>
+                            </thead>
+                            <tbody id="users-table-body">
+                                <tr><td colspan="4" class="text-center text-muted py-4">በመጫን ላይ...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-4">
+                <div class="table-container">
+                    <h5 class="fw-bold text-secondary mb-3"><i class="fa-solid fa-money-bill-transfer me-2 text-warning"></i> የTID Cache</h5>
+                    <div class="list-group" id="tid-cache-list" style="max-height: 350px; overflow-y: auto;">
+                        <div class="text-center text-muted py-4">ምንም የለም</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const ADMIN_PASSWORD = "aman"; 
+        let db;
+
+        
+
+        function checkAuth() {
+            const sessionAuth = sessionStorage.getItem("admin_logged_in");
+            if (sessionAuth === "true") { 
+                document.body.style.display = "block"; 
+                initDashboard(); 
+            } else {
+                const pass = prompt("🔐 እባክዎ የአድሚን ይለፍ ቃል ያስገቡ፦");
+                if (pass === ADMIN_PASSWORD) { 
+                    sessionStorage.setItem("admin_logged_in", "true"); 
+                    document.body.style.display = "block"; 
+                    initDashboard(); 
+                } else { 
+                    alert("❌ የተሳሳተ ይለፍ ቃል!"); 
+                    window.location.reload(); 
+                }
+            }
+        }
+        window.onload = checkAuth;
+
+        function initDashboard() {
+            const firebaseConfig = {
+                apiKey: "AIzaSyD2l0Q4JCedRIshH0vqacqCee0L1qVwN_g",
+                authDomain: "my-app-project-1e0bb.firebaseapp.com",
+                databaseURL: "https://my-app-project-1e0bb-default-rtdb.firebaseio.com",
+                projectId: "my-app-project-1e0bb",
+                storageBucket: "my-app-project-1e0bb.firebasestorage.app",
+                messagingSenderId: "280130045202",
+                appId: "1:280130045202:web:90c9a40d313b4d0b905fcb",
+                measurementId: "G-WCWWP0GQ0G"
+            };
+            
+            if (!firebase.apps.length) {
+                firebase.initializeApp(firebaseConfig);
+            }
+            db = firebase.database();
+
+            db.ref(".info/connected").on("value", (snap) => {
+                document.getElementById("connection-status").innerHTML = snap.val() ? '<i class="fa-solid fa-circle-dot me-1"></i> ኦንላይን' : '<i class="fa-solid fa-circle-dot me-1"></i> ኦፍላይን';
+                document.getElementById("connection-status").className = snap.val() ? "navbar-text text-success" : "navbar-text text-danger";
+            });
+
+            // 📥 1. የዲፖዚት ጥያቄዎችን ከFirebase አንብቦ የሚያሳይ ክፍል
+            // 📥 1. የተስተካከለ የዲፖዚት ጥያቄ ማሳያ
+db.ref("deposit_requests").orderByChild("status").equalTo("pending").on("value", snapshot => {
+    const container = document.getElementById("deposit-requests-body");
+    if (!container) return;
+    container.innerHTML = "";
+
+    if (snapshot.exists()) {
+        snapshot.forEach(childSnapshot => {
+            const data = childSnapshot.val();
+            const key = childSnapshot.key;
+            const amount = parseFloat(data.amount || 0);
+            const userId = data.userId;
+
+            // የባላንስ ስሌት ለመስራት የተጠቃሚውን መረጃ ከ "users" እንወስዳለን
+            db.ref("users/" + userId).once("value", userSnap => {
+                const user = userSnap.val();
+                const oldBalance = user ? parseFloat(user.balance || 0) : 0;
+                const newBalance = oldBalance + amount;
+
+                container.innerHTML += `
+                    <tr>
+                        <td><strong>${data.holder || 'ተጫዋች'}</strong><br><small>ID: ${userId}</small></td>
+                        <td><span class="badge bg-warning text-dark">${data.bank || 'CBE'}</span></td>
+                        <td>${data.account || '-'}</td>
+                        <td>
+                            <div class="fw-bold text-success">${amount} ETB</div>
+                            <small class="text-muted">ባላንስ: ${oldBalance} → <b>${newBalance}</b></small>
+                        </td>
+                        <td class="text-center">
+                            <button onclick="approveDeposit('${key}', '${userId}', ${amount})" 
+                                    class="btn btn-sm btn-success">✔️</button>
+                            <button onclick="rejectDeposit('${key}')" 
+                                    class="btn btn-sm btn-danger">✖️</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        });
+    } else {
+        container.innerHTML = "<tr><td colspan='5' class='text-center text-muted'>የሚጠባበቅ የለም</td></tr>";
+    }
+});
+
+            // 📥 2. ዊዝድሮዎች
+            db.ref("withdraw_requests").on("value", (snapshot) => {
+                const container = document.getElementById("withdraw-requests-body"); 
+                container.innerHTML = "";
+                
+                if (snapshot.exists()) {
+                    let hasData = false;
+                    Object.keys(snapshot.val()).forEach(reqId => {
+                        const req = snapshot.val()[reqId];
+                        
+                        if (req.status !== "completed" && req.status !== "rejected") {
+                            hasData = true;
+                            const tr = document.createElement("tr");
+
+                            const displayUsername = req.username || req.name || 'ተጫዋች';
+                            const displayUserId = req.userId || req.user_id || 'የለም';
+                            const displayBank = req.bank || req.bank_name || req.bankName || 'ቴሌብር';
+                            const displayAccount = req.account || req.account_info || req.account_number || req.accountNumber || 'የለም';
+                            const displayHolder = req.holder || req.account_owner || req.accountOwner || '-';
+                            const displayAmount = req.amount || 0;
+                            const displayStatus = req.status || 'በጥበቃ ላይ';
+
+                            tr.innerHTML = `
+                                <td><b>${displayUsername}</b><br><small class="text-muted">${displayUserId}</small></td>
+                                <td><span class="badge bg-secondary">${displayBank}</span></td>
+                                <td><code>${displayAccount}</code></td>
+                                <td><small>${displayHolder}</small></td>
+                                <td><b class="text-danger">${displayAmount} ETB</b></td>
+                                <td><span class="status-badge status-pending">${displayStatus}</span></td>
+                                <td class="text-center">
+                                    <button class="btn btn-sm btn-success py-0 px-1 me-1" title="ክፍያ አጽድቅ" onclick="approveWithdrawNew('${reqId}')">✔</button>
+                                    <button class="btn btn-sm btn-danger py-0 px-1" title="ጥያቄ ሰርዝ (Refund)" onclick="rejectWithdrawNew('${reqId}')">✖</button>
+                                </td>
+                            `;
+                            container.appendChild(tr);
+                        }
+                    });
+                    
+                    if(!hasData) {
+                        container.innerHTML = "<tr><td colspan='7' class='text-center text-muted'>የሚጠባበቅ የለም</td></tr>";
+                    }
+                } else { 
+                    container.innerHTML = "<tr><td colspan='7' class='text-center text-muted'>የሚጠባበቅ የለም</td></tr>"; 
+                }
+            });
+          
+// 👥 3. የተጫዋቾች መቆጣጠሪያ (አዲሱ ክፍል)
+db.ref("users").on("value", (snapshot) => {
+    const usersTableBody = document.getElementById("users-table-body"); 
+    usersTableBody.innerHTML = "";
+    let totalUsers = 0, totalBalance = 0;
+    
+    if (snapshot.exists()) {
+        snapshot.forEach(userSnapshot => {
+            const userId = userSnapshot.key;
+            const user = userSnapshot.val();
+            
+            // የተጫዋች መረጃዎችን ከFirebase መውሰድ
+            const name = user.username || 'ያልታወቀ';
+            const tgName = user.telegram_name || 'የለም'; // አዲስ
+            const tgPhone = user.telegram_phone || 'የለም'; // አዲስ
+            const balance = parseFloat(user.balance || 0);
+            
+            totalUsers++; 
+            totalBalance += balance;
+            
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+                <td><strong>${name}</strong><br><small class='text-muted'>ID: ${userId}</small></td>
+                <td>
+                    <span class="badge bg-info text-dark">TG: ${tgName}</span><br>
+                    <small class="text-secondary">${tgPhone}</small>
+                </td>
+                <td><strong class="text-success">${balance.toFixed(1)} ETB</strong></td>
+                <td class="text-center">
+                    <button class="btn btn-sm btn-primary py-0 px-2 me-1" onclick="editBalance('${userId}', ${balance})">✏️</button>
+                    <button class="btn btn-sm btn-warning py-0 px-2" onclick="resetPlayer('${userId}')">🔄</button>
+                </td>
+            `;
+            tr.setAttribute("data-search-term", (name + " " + userId).toLowerCase());
+            usersTableBody.appendChild(tr);
+        });
+        document.getElementById("stat-total-users").innerText = totalUsers;
+        document.getElementById("stat-total-balance").innerText = totalBalance.toLocaleString();
+    }
+});
+        
+            // TID Cache
+            db.ref("tid_cache").on("value", (snapshot) => {
+                const list = document.getElementById("tid-cache-list"); list.innerHTML = ""; let count = 0;
+                if (snapshot.exists()) {
+                    Object.keys(snapshot.val()).forEach(tid => {
+                        count++; const div = document.createElement("div");
+                        div.className = "list-group-item d-flex justify-content-between align-items-center py-1 mb-1 border rounded";
+                        div.innerHTML = `<span><small class='badge bg-warning text-dark'>${tid}</small></span><span class='badge bg-dark'>${snapshot.val()[tid]} ETB</span>`;
+                        list.appendChild(div);
+                    });
+                }
+                document.getElementById("stat-total-tids").innerText = count;
+            });
+        }
+
+        // 🔄 የተጫዋችን ባላንስ በእጅ ለመቀየር የሚረዳ ፈንክሽን
+        window.editBalance = function(userId, currentBalance) {
+            const newBalance = prompt(`ለተጫዋች ${userId} አዲስ የባላንስ መጠን ያስገቡ:`, currentBalance);
+            if (newBalance !== null && !isNaN(newBalance) && newBalance.trim() !== "") {
+                const updatedBalance = parseFloat(newBalance);
+                db.ref(`users/${userId}`).update({
+                    balance: updatedBalance
+                }).then(() => {
+                    alert(`✅ የተጫዋች ${userId} ባላንስ ወደ ${updatedBalance} ETB ተቀይሯል!`);
+                }).catch((error) => {
+                    alert(`❌ ስህተት አጋጥሟል: ` + error.message);
+                });
+            }
+        };
+
+        // 🔄 የተጫዋችን ባላንስ 0 ለማድረግ
+        window.resetPlayer = function(userId) {
+            if (confirm(`⚠️ እርግጠኛ ነዎት የተጫዋች ${userId} ሂሳብ 0 መሆን አለበት?`)) {
+                db.ref(`users/${userId}`).update({
+                    balance: 0
+                }).then(() => {
+                    alert(`🔄 የ ${userId} ባላንስ 0 ሆኗል!`);
+                });
+            }
+        };
+
+        // ራስ-ሰር ኤስኤምኤስ አመሳክሮ የሚያጸድቀው ፈንክሽን
+        function checkSMSAndAutoApprove(dbKey, userId, playerAmount, holderName) {
+            db.ref('received_sms').once('value', smsSnapshot => {
+                if (smsSnapshot.exists()) {
+                    smsSnapshot.forEach(smsChild => {
+                        const smsData = smsChild.val();
+                        const smsText = smsData.body || smsData.text || "";
+                        
+                        if (smsText.includes(playerAmount.toString())) {
+                            db.ref('users/' + userId + '/balance').transaction(currentBal => {
+                                return (currentBal || 0) + playerAmount;
+                            }, (error, committed) => {
+                                if (committed) {
+                                    db.ref('deposit_requests/' + dbKey).update({ status: "approved" });
+                                    db.ref('received_sms/' + smsChild.key).remove();
+                                    console.log(`ለ ${holderName} የተላከው ${playerAmount} ETB በራስ-ሰር ጸድቋል!`);
+                                }
+                            });
+                        }
+                    });
+                }
+            });
+        }
+
+        // በእጅ ማጽደቂያ ፈንክሽን
+        window.approveDeposit = function(key, userId, amount) {
+            db.ref('users/' + userId + '/balance').transaction(currentBal => {
+                return (currentBal || 0) + amount;
+            }, (error, committed) => {
+                if (committed) {
+                    db.ref('deposit_requests/' + key).update({ status: "approved" });
+                    alert("ዲፖዚቱ በተሳካ ሁኔታ ጽድቋል!");
+                }
+            });
+        };
+
+        // ውድቅ ማድረጊያ ፈንክሽን
+        window.rejectDeposit = function(key) {
+            if (confirm("ይህንን የዲፖዚት ጥያቄ መሰረዝ ትፈልጋለህ?")) {
+                db.ref('deposit_requests/' + key).update({ status: "rejected" });
+            }
+        };
+       // የዊዝድሮው ማጽደቂያ ፈንክሽን
+        window.approveWithdrawNew = function(reqId) {
+            if (confirm("ይህ ክፍያ በቴሌብር/በባንክ መፈጸሙን አረጋግጠሃል? ስታተሱ ወደ 'ተከፍሏል' ይቀየራል።")) {
+                db.ref('withdraw_requests/' + reqId).update({
+                    status: "completed",
+                    processedAt: firebase.database.ServerValue.TIMESTAMP
+                }).then(() => {
+                    alert("ጥያቄው በዳሽቦርዱ ላይ ጽድቋል!");
+                }).catch(err => alert("ስህተት: " + err.message));
+            }
+        };
+
+        // የዊዝድሮው መሰረዣ ፈንክሽን (ብሩን ሪፈንድ ያደርጋል)
+        window.rejectWithdrawNew = function(reqId) {
+            if (confirm("ይህንን ጥያቄ መሰረዝ ትፈልጋለህ? የተያዘው የሰውየው ብር ወደ አካውንቱ ይመለሳል።")) {
+                db.ref('withdraw_requests/' + reqId).once('value').then(snapshot => {
+                    const req = snapshot.val();
+                    if (!req) return;
+
+                    const userId = req.userId || req.user_id;
+                    const amount = parseFloat(req.amount);
+
+                    db.ref('users/' + userId + '/balance').transaction(currentBalance => {
+                        return (currentBalance || 0) + amount;
+                    }).then(() => {
+                        db.ref('withdraw_requests/' + reqId).update({
+                            status: "rejected",
+                            processedAt: firebase.database.ServerValue.TIMESTAMP
+                        }).then(() => {
+                            alert("ጥያቄው ተሰርዟል! ገንዘቡ ወደ ተጫዋቹ ተመልሷል።");
+                        });
+                    });
+                }).catch(err => alert("ስህተት: " + err.message));
+            }
+        };
+
+        document.getElementById("user-search").addEventListener("input", function(e) {
+            const term = e.target.value.toLowerCase();
+            document.querySelectorAll("#users-table-body tr").forEach(row => {
+                const txt = row.getAttribute("data-search-term");
+                row.style.display = txt && txt.includes(term) ? "" : "none";
+            });
+        });
+// ✅ SEND COMMAND TO PYTHON AI
+
+        
+ 
+    </script>
+</body>
+</html>

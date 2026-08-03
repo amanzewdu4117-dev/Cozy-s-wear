@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="am">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cozy's Wear</title>
+
+    <link rel="stylesheet" href="style.css">
+
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+</head>
+<body>
+
+<header>
+    <h1>🧥 Cozy's Wear</h1>
+    <p>Inventory & Consignment Management</p>
+</header>
+
+<div class="dashboard">
+
+    <div class="card">
+        <h2>👤 Owners</h2>
+        <h1 id="owners">0</h1>
+    </div>
+
+    <div class="card">
+        <h2>📦 Products</h2>
+        <h1 id="products">0</h1>
+    </div>
+
+    <div class="card">
+        <h2>🛒 Sales</h2>
+        <h1 id="sales">0</h1>
+    </div>
+
+    <div class="card">
+        <h2>💰 Unpaid</h2>
+        <h1 id="unpaid">0 ETB</h1>
+    </div>
+
+</div>
+
+<div class="menu">
+
+<button onclick="location.href='owners.html'">
+👤 Owners
+</button>
+
+<button onclick="location.href='products.html'">
+📦 Products
+</button>
+
+<button onclick="location.href='sales.html'">
+🛒 Sales
+</button>
+
+<button onclick="location.href='payments.html'">
+💵 Payments
+</button>
+
+<button onclick="location.href='reports.html'">
+📊 Reports
+</button>
+
+</div>
+
+<script src="firebase.js"></script>
+<script src="app.js"></script>
+
+</body>
+</html>

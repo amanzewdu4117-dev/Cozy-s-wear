@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="am">
+
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Payments - Cozy's Wear</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+</head>
+
+<body>
+
+<header>
+<h1>💵 Payments</h1>
+<p>የባለቤቶች ክፍያ አስተዳደር</p>
+</header>
+
+<div class="card">
+<h3>የባለቤት ሂሳብ ማጠቃለያ</h3>
+<p>📦 ጠቅላላ የተሸጠ እቃ: <b id="totalItemsCount" style="color: blue;">0 / 0</b></p>
+<p>💰 ጠቅላላ የሽያጭ መጠን: <b id="totalSales">0 / 0 ETB</b></p>
+<p>💵 ጠቅላላ የተሸጠ/የተከፈለ ገቢ: <b id="totalPaidSales">0 / 0 ETB</b></p>
+<p>📤 ለባለቤት የተላከ/የገባ: <b id="totalPaidToOwner">0 / 0 ETB</b></p>
+<p>📌 ቀሪ (Balance): <b id="balance" style="color: red;">0 ETB</b></p>
+</div>
+
+<div class="card">
+<select id="paymentOwner">
+<option value="">-- ባለቤት ይምረጡ --</option>
+</select>
+
+<input id="paymentAmount" placeholder="ለባለቤት የተከፈለ መጠን ETB" type="number">
+
+<select id="paymentStatus">
+<option value="paid">Paid (የተከፈለ) ✅</option>
+<option value="unpaid">Unpaid (ቀሪ/ያልተከፈለ) ❌</option>
+</select>
+
+<button onclick="addPayment()">➕ Add Payment</button>
+<button onclick="clearOwnerPayments()" style="background-color: #d9534f; color: white; margin-top: 10px;">🗑️ የዚህን ባለቤት ክፍያዎች በሙሉ Clear አድርግ</button>
+</div>
+
+<div class="card">
+<h2>የተከፈሉ ክፍያዎች (Paid List)</h2>
+<ul id="paidList"></ul>
+</div>
+
+<div class="card">
+<h2>ያልተከፈሉ / ቀሪ (Unpaid List)</h2>
+<ul id="unpaidList"></ul>
+</div>
+
+<script src="firebase.js"></script>
+
+<script>
+const db = firebase.database();
+
+// Owners ማምጣት
+db.ref("owners").on("value", (snapshot) => {
+    let options = '<option value="">-- ባለቤት ይምረጡ --</option>';
+    snapshot.forEach((item) => {
+        let data = item.val();
+        options += `<option value="${data.name}">${data.name}</option>`;
+    });
+    document.getElementById("paymentOwner").innerHTML = options;
+});
+
+// Owner ሲመረጥ ሂሳብ እና ንጽጽር (Calculation) ማሳየት
+document.getElementById("paymentOwner").addEventListener("change", calculateBalance);
+
+function calculateBalance() {
+    let owner = document.getElementById("paymentOwner").value;
+    if (owner == "") {
+        document.getElementById("totalItemsCount").innerHTML = "0 / 0";
+        document.getElementById("totalSales").innerHTML = "0 / 0 ETB";
+        document.getElementById("totalPaidSales").innerHTML = "0 / 0 ETB";
+        document.getElementById("totalPaidToOwner").innerHTML = "0 / 0 ETB";
+        document.getElementById("balance").innerHTML = "0 ETB";
+        return;
+    }
+
+    db.ref("products").once("value", (productsSnapshot) => {
+        db.ref("sales").once("value", (salesSnapshot) => {
+            
+            let ownerTotalItems = 0;
+            let ownerTotalPotentialPrice = 0;
+            let ownerSoldItems = 0;
+            let ownerSoldAmount = 0;
+
+            productsSnapshot.forEach((pItem) => {
+                let pData = pItem.val();
+                if (pData.owner && owner && pData.owner.trim() == owner.trim()) {
+                    let unitPrice = Number(pData.price || 0);
+                    let currentStock = Number(pData.stock || 0);
+                    
+                    let itemSoldQty = 0;
+                    salesSnapshot.forEach((sItem) => {
+                        let sData = sItem.val();
+                        if (sData.product === pData.name && sData.owner && sData.owner.trim() == owner.trim()) {
+                            itemSoldQty += Number(sData.quantity || 1);
+                        }
+                    });
+
+                    let totalItemQty = currentStock + itemSoldQty;
+                    ownerTotalItems += totalItemQty;
+                    ownerTotalPotentialPrice += (totalItemQty * unitPrice);
+
+                    ownerSoldItems += itemSoldQty;
+                    ownerSoldAmount += (itemSoldQty * unitPrice);
+                }
+            });
+
+            db.ref("payments").once("value", (paySnap) => {
+                let totalPaidToOwnerAmount = 0;
+
+                paySnap.forEach((item) => {
+                    let data = item.val();
+                    if (data.owner && owner && data.owner.trim() == owner.trim() && data.status == "paid") {
+                        totalPaidToOwnerAmount += Number(data.amount || 0);
+                    }
+                });
+
+                let itemsDisplay = `${ownerSoldItems} / ${ownerTotalItems}`;
+                let salesDisplay = `${ownerSoldAmount} / ${ownerTotalPotentialPrice} ETB`;
+                let paidSalesDisplay = `${ownerSoldAmount} / ${ownerTotalPotentialPrice} ETB`;
+                let ownerPaidDisplay = `${totalPaidToOwnerAmount} / ${ownerSoldAmount} ETB`;
+                let remainingBalance = ownerSoldAmount - totalPaidToOwnerAmount;
+
+                let itemsElement = document.getElementById("totalItemsCount");
+                let salesElement = document.getElementById("totalSales");
+
+                itemsElement.innerHTML = itemsDisplay;
+                salesElement.innerHTML = salesDisplay;
+                document.getElementById("totalPaidSales").innerHTML = paidSalesDisplay;
+                document.getElementById("totalPaidToOwner").innerHTML = ownerPaidDisplay;
+                document.getElementById("balance").innerHTML = remainingBalance + " ETB";
+
+                if (ownerTotalItems > 0 && ownerSoldItems >= ownerTotalItems) {
+                    itemsElement.style.color = "red";
+                    salesElement.style.color = "red";
+                } else {
+                    itemsElement.style.color = "blue";
+                    salesElement.style.color = "black";
+                }
+            });
+        });
+    });
+}
+
+function addPayment() {
+    let owner = document.getElementById("paymentOwner").value;
+    let amount = document.getElementById("paymentAmount").value;
+    let status = document.getElementById("paymentStatus").value;
+
+    if (owner == "") {
+        alert("ባለቤት ይምረጡ");
+        return;
+    }
+    if (amount == "" || Number(amount) <= 0) {
+        alert("እባክዎ ትክክለኛ የገንዘብ መጠን ያስገቡ");
+        return;
+    }
+
+    db.ref("payments").push({
+        owner: owner,
+        amount: Number(amount),
+        status: status,
+        date: new Date().toLocaleString()
+    });
+
+    document.getElementById("paymentAmount").value = "";
+    calculateBalance();
+    alert("ክፍያው በተሳካ ሁኔታ ተመዝግቧል!");
+}
+
+// አንድን የተወሰነ የክፍያ ታሪክ ማጥፊያ (Delete Single Payment)
+function deletePayment(paymentId){
+    if(confirm("ይህንን የክፍያ ታሪክ ማጥፋት (Delete ማድረግ) ትፈልጋለህ?")){
+        db.ref("payments/" + paymentId).remove().then(() => {
+            alert("የክፍያ ታሪኩ ተሰርዟል!");
+            calculateBalance();
+        }).catch((error) => {
+            alert("ስህተት ተፈጥሯል: " + error.message);
+        });
+    }
+}
+
+// የተመረጠውን ባለቤት የክፍያ ታሪኮች በሙሉ ማጽጃ (Clear All Payments for Owner)
+function clearOwnerPayments(){
+    let owner = document.getElementById("paymentOwner").value;
+    if(owner == ""){
+        alert("እባክዎ መጀመሪያ ባለቤት ይምረጡ");
+        return;
+    }
+
+    if(confirm(`የ "${owner}" ን የክፍያ ታሪኮች በሙሉ ማጥፋት (Clear ማድረግ) እርግጠኛ ነዎት?`)){
+        db.ref("payments").once("value", (snapshot) => {
+            snapshot.forEach((item) => {
+                let data = item.val();
+                if(data.owner && data.owner.trim() == owner.trim()){
+                    db.ref("payments/" + item.key).remove();
+                }
+            });
+            alert("የክፍያ ታሪኮቹ በሙሉጸድተዋል!");
+            calculateBalance();
+        });
+    }
+}
+
+// Payments Lists Split (Paid & Unpaid) with Delete Button
+db.ref("payments").on("value", (snapshot) => {
+    let paidListHTML = "";
+    let unpaidListHTML = "";
+
+    snapshot.forEach((item) => {
+        let paymentId = item.key;
+        let data = item.val();
+
+        if (data.status === "paid") {
+            paidListHTML += `
+                <li style="color: green; margin-bottom: 8px;">
+                    👤 <b>${data.owner}</b> - <b>${data.amount} ETB</b> (Paid ✅) <br>
+                    <small style="color:gray;">${data.date || ''}</small><br>
+                    <button onclick="deletePayment('${paymentId}')" style="background-color: #d9534f; color: white; padding: 2px 6px; border: none; border-radius: 3px; cursor: pointer; font-size: 12px;">🗑️ Delete</button>
+                </li><hr>
+            `;
+        } else {
+            unpaidListHTML += `
+                <li style="color: red; margin-bottom: 8px;">
+                    👤 <b>${data.owner}</b> - <b>${data.amount} ETB</b> (Unpaid ❌) <br>
+                    <small style="color:gray;">${data.date || ''}</small><br>
+                    <button onclick="deletePayment('${paymentId}')" style="background-color: #d9534f; color: white; padding: 2px 6px; border: none; border-radius: 3px; cursor: pointer; font-size: 12px;">🗑️ Delete</button>
+                </li><hr>
+            `;
+        }
+    });
+
+    document.getElementById("paidList").innerHTML = paidListHTML || "<li>ምንም የተከፈለ ሂሳብ የለም</li>";
+    document.getElementById("unpaidList").innerHTML = unpaidListHTML || "<li>ምንም ያልተከፈለ ቀሪ የለም</li>";
+});
+</script>
+
+</body>
+</html>
