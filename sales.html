@@ -24,7 +24,8 @@
 <input id="salePrice" placeholder="የሽያጭ ዋጋ ETB" type="number">
 <input id="buyerName" placeholder="የገዢ ስም">
 
-<button onclick="addSale()">➕ Add Sale</button>
+<!-- በተኑን ሲነኩ ፓስወርድ ይጠይቃል -->
+<button onclick="checkPasswordAndAddSale()">➕ Add Sale</button>
 </div>
 
 <div class="card">
@@ -36,6 +37,7 @@
 
 <script>
 const db = firebase.database();
+const ADMIN_PASSWORD = "aman"; // እዚህ ጋር የአድሚን ፓስወርድዎን መቀየር ይችላሉ
 
 // የሚገኙ እቃዎችን በ Select ሜኑ ማምጣት
 db.ref("products").on("value", (snapshot) => {
@@ -54,6 +56,16 @@ db.ref("products").on("value", (snapshot) => {
 
     document.getElementById("saleProduct").innerHTML = options;
 });
+
+// 🔐 አድሚን ፓስወርድ ማረጋገጫ ለ Add Sale
+function checkPasswordAndAddSale() {
+    let pass = prompt("🔐 ሽያጭ ለመመዝገብ የአድሚን ፓስወርድ ያስገቡ፦");
+    if (pass === ADMIN_PASSWORD) {
+        addSale();
+    } else if (pass !== null) {
+        alert("❌ የተሳሳተ ፓስወርድ!");
+    }
+}
 
 function addSale(){
     let productId = document.getElementById("saleProduct").value;
@@ -89,7 +101,7 @@ function addSale(){
             status: newStatus
         });
 
-        // ሽያጭ መዝግብ (የ product_id ን ጭምር መያዙ ሲሰረዝ ስቶኩን ለመመለስ ይጠቅማል)
+        // ሽያጭ መዝግብ
         db.ref("sales").push({
             productId: productId,
             product: product.name,
@@ -107,6 +119,16 @@ function addSale(){
 
         alert("Sale በተሳካ ሁኔታ ተመዝግቧል!");
     });
+}
+
+// 🔐 አድሚን ፓስወርድ ማረጋገጫ ለ Delete Sale
+function checkPasswordAndDeleteSale(saleId, productId, quantity) {
+    let pass = prompt("🔐 የሽያጭ ታሪኩን ለማጥፋት የአድሚን ፓስወርድ ያስገቡ፦");
+    if (pass === ADMIN_PASSWORD) {
+        deleteSale(saleId, productId, quantity);
+    } else if (pass !== null) {
+        alert("❌ የተሳሳተ ፓስወርድ!");
+    }
 }
 
 // የሽያጭ ታሪክ ማጥፊያ እና ስቶክ መመለሻ ተግባር (Delete Sale Function)
@@ -139,7 +161,7 @@ function deleteSale(saleId, productId, quantity){
     }
 }
 
-// የሽያጭ ዝርዝር ከ Delete ቁልፍ ጋር ማሳየት
+// የሽያጭ ዝርዝር ከ Protected Delete ቁልፍ ጋር ማሳየት
 db.ref("sales").on("value",(snapshot)=>{
     let list = "";
     snapshot.forEach((item)=>{
@@ -150,7 +172,7 @@ db.ref("sales").on("value",(snapshot)=>{
             <li>
                 🛒 <b>${data.product}</b> - ${data.price} ETB - ገዢ: ${data.buyer || 'نامعلوم'} <br>
                 <small style="color:gray;">ቀን: ${data.date || ''}</small><br>
-                <button onclick="deleteSale('${saleId}', '${data.productId || ''}', ${data.quantity || 1})" style="background-color: #d9534f; color: white; padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; margin-top: 5px;">🗑️ Delete Sale</button>
+                <button onclick="checkPasswordAndDeleteSale('${saleId}', '${data.productId || ''}', ${data.quantity || 1})" style="background-color: #d9534f; color: white; padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; margin-top: 5px;">🗑️ Delete Sale</button>
             </li><hr>
         `;
     });
