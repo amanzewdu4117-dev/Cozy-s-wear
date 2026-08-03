@@ -38,8 +38,9 @@
 <option value="unpaid">Unpaid (ቀሪ/ያልተከፈለ) ❌</option>
 </select>
 
-<button onclick="addPayment()">➕ Add Payment</button>
-<button onclick="clearOwnerPayments()" style="background-color: #d9534f; color: white; margin-top: 10px;">🗑️ የዚህን ባለቤት ክፍያዎች በሙሉ Clear አድርግ</button>
+<!-- በተኑን ሲነኩ ፓስወርድ ይጠይቃል -->
+<button onclick="checkPasswordAndAdd()">➕ Add Payment</button>
+<button onclick="checkPasswordAndClear()" style="background-color: #d9534f; color: white; margin-top: 10px;">🗑️ የዚህን ባለቤት ክፍያዎች በሙሉ Clear አድርግ</button>
 </div>
 
 <div class="card">
@@ -56,6 +57,7 @@
 
 <script>
 const db = firebase.database();
+const ADMIN_PASSWORD = "aman"; // እዚህ ጋር የአድሚን ፓስወርድዎን መቀየር ይችላሉ
 
 // Owners ማምጣት
 db.ref("owners").on("value", (snapshot) => {
@@ -114,17 +116,21 @@ function calculateBalance() {
 
             db.ref("payments").once("value", (paySnap) => {
                 let totalPaidToOwnerAmount = 0;
+                let totalPaidSalesRecorded = 0;
 
                 paySnap.forEach((item) => {
                     let data = item.val();
-                    if (data.owner && owner && data.owner.trim() == owner.trim() && data.status == "paid") {
-                        totalPaidToOwnerAmount += Number(data.amount || 0);
+                    if (data.owner && owner && data.owner.trim() == owner.trim()) {
+                        if (data.status == "paid") {
+                            totalPaidToOwnerAmount += Number(data.amount || 0);
+                            totalPaidSalesRecorded += Number(data.amount || 0);
+                        }
                     }
                 });
 
                 let itemsDisplay = `${ownerSoldItems} / ${ownerTotalItems}`;
                 let salesDisplay = `${ownerSoldAmount} / ${ownerTotalPotentialPrice} ETB`;
-                let paidSalesDisplay = `${ownerSoldAmount} / ${ownerTotalPotentialPrice} ETB`;
+                let paidSalesDisplay = `${totalPaidSalesRecorded} / ${ownerTotalPotentialPrice} ETB`;
                 let ownerPaidDisplay = `${totalPaidToOwnerAmount} / ${ownerSoldAmount} ETB`;
                 let remainingBalance = ownerSoldAmount - totalPaidToOwnerAmount;
 
@@ -147,6 +153,16 @@ function calculateBalance() {
             });
         });
     });
+}
+
+// 🔐 አድሚን ፓስወርድ ማረጋገጫ ለ Add Payment
+function checkPasswordAndAdd() {
+    let pass = prompt("🔐 ክፍያ ለመመዝገብ የአድሚን ፓስወርድ ያስገቡ፦");
+    if (pass === ADMIN_PASSWORD) {
+        addPayment();
+    } else if (pass !== null) {
+        alert("❌ የተሳሳተ ፓስወርድ!");
+    }
 }
 
 function addPayment() {
@@ -175,7 +191,16 @@ function addPayment() {
     alert("ክፍያው በተሳካ ሁኔታ ተመዝግቧል!");
 }
 
-// አንድን የተወሰነ የክፍያ ታሪክ ማጥፊያ (Delete Single Payment)
+// 🔐 አድሚን ፓስወርድ ማረጋገጫ ለ Delete Single Payment
+function checkPasswordAndDelete(paymentId) {
+    let pass = prompt("🔐 ይህንን የክፍያ ታሪክ ለማጥፋት የአድሚን ፓስወርድ ያስገቡ፦");
+    if (pass === ADMIN_PASSWORD) {
+        deletePayment(paymentId);
+    } else if (pass !== null) {
+        alert("❌ የተሳሳተ ፓስወርድ!");
+    }
+}
+
 function deletePayment(paymentId){
     if(confirm("ይህንን የክፍያ ታሪክ ማጥፋት (Delete ማድረግ) ትፈልጋለህ?")){
         db.ref("payments/" + paymentId).remove().then(() => {
@@ -187,14 +212,24 @@ function deletePayment(paymentId){
     }
 }
 
-// የተመረጠውን ባለቤት የክፍያ ታሪኮች በሙሉ ማጽጃ (Clear All Payments for Owner)
-function clearOwnerPayments(){
+// 🔐 አድሚን ፓስወርድ ማረጋገጫ ለ Clear All Payments
+function checkPasswordAndClear() {
     let owner = document.getElementById("paymentOwner").value;
     if(owner == ""){
         alert("እባክዎ መጀመሪያ ባለቤት ይምረጡ");
         return;
     }
 
+    let pass = prompt(`🔐 የ "${owner}" ን የክፍያ ታሪኮች በሙሉ ለማጽዳት የአድሚን ፓስወርድ ያስገቡ፦`);
+    if (pass === ADMIN_PASSWORD) {
+        clearOwnerPayments();
+    } else if (pass !== null) {
+        alert("❌ የተሳሳተ ፓስወርድ!");
+    }
+}
+
+function clearOwnerPayments(){
+    let owner = document.getElementById("paymentOwner").value;
     if(confirm(`የ "${owner}" ን የክፍያ ታሪኮች በሙሉ ማጥፋት (Clear ማድረግ) እርግጠኛ ነዎት?`)){
         db.ref("payments").once("value", (snapshot) => {
             snapshot.forEach((item) => {
@@ -203,13 +238,13 @@ function clearOwnerPayments(){
                     db.ref("payments/" + item.key).remove();
                 }
             });
-            alert("የክፍያ ታሪኮቹ በሙሉጸድተዋል!");
+            alert("የክፍያ ታሪኮቹ በሙሉ ጸድተዋል!");
             calculateBalance();
         });
     }
 }
 
-// Payments Lists Split (Paid & Unpaid) with Delete Button
+// Payments Lists Split (Paid & Unpaid) with Protected Delete Button
 db.ref("payments").on("value", (snapshot) => {
     let paidListHTML = "";
     let unpaidListHTML = "";
@@ -223,7 +258,7 @@ db.ref("payments").on("value", (snapshot) => {
                 <li style="color: green; margin-bottom: 8px;">
                     👤 <b>${data.owner}</b> - <b>${data.amount} ETB</b> (Paid ✅) <br>
                     <small style="color:gray;">${data.date || ''}</small><br>
-                    <button onclick="deletePayment('${paymentId}')" style="background-color: #d9534f; color: white; padding: 2px 6px; border: none; border-radius: 3px; cursor: pointer; font-size: 12px;">🗑️ Delete</button>
+                    <button onclick="checkPasswordAndDelete('${paymentId}')" style="background-color: #d9534f; color: white; padding: 2px 6px; border: none; border-radius: 3px; cursor: pointer; font-size: 12px;">🗑️ Delete</button>
                 </li><hr>
             `;
         } else {
@@ -231,7 +266,7 @@ db.ref("payments").on("value", (snapshot) => {
                 <li style="color: red; margin-bottom: 8px;">
                     👤 <b>${data.owner}</b> - <b>${data.amount} ETB</b> (Unpaid ❌) <br>
                     <small style="color:gray;">${data.date || ''}</small><br>
-                    <button onclick="deletePayment('${paymentId}')" style="background-color: #d9534f; color: white; padding: 2px 6px; border: none; border-radius: 3px; cursor: pointer; font-size: 12px;">🗑️ Delete</button>
+                    <button onclick="checkPasswordAndDelete('${paymentId}')" style="background-color: #d9534f; color: white; padding: 2px 6px; border: none; border-radius: 3px; cursor: pointer; font-size: 12px;">🗑️ Delete</button>
                 </li><hr>
             `;
         }
