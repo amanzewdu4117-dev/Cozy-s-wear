@@ -29,11 +29,32 @@
 
 <div class="card">
 <h3>የባለቤት ሂሳብ ማጠቃለያ</h3>
-<p>📦 ጠቅላላ የተሸጠ እቃ: <b id="totalItemsCount" style="color: blue;">0 / 0</b></p>
-<p>💰 ጠቅላላ የሽያጭ መጠን: <b id="totalSales">0 / 0 ETB</b></p>
-<p>💵 ጠቅላላ የተሸጠ/የተከፈለ ገቢ: <b id="totalPaidSales">0 / 0 ETB</b></p>
-<p>📤 ለባለቤት የተላከ/የገባ: <b id="totalPaidToOwner">0 / 0 ETB</b></p>
-<p>📌 ቀሪ (Balance): <b id="balance" style="color: red;">0 ETB</b></p>
+
+
+<!-- በሰንጠረዥ (Table) መልክ የተዘጋጀ የእቃዎች ዝርዝር ማጠቃለያ -->
+<div style="overflow-x: auto; margin-bottom: 12px;">
+    <table style="width: 100%; border-collapse: collapse; font-size: 13px; text-align: right;">
+        <thead>
+            <tr style="background-color: #f1f5f9; color: #334155; border-bottom: 2px solid #cbd5e1;">
+                <th style="padding: 6px; text-align: right;">እቃ</th>
+                <th style="padding: 6px; text-align: center;">ዋጋ</th>
+                <th style="padding: 6px; text-align: center;">ቀሪ / ጠቅላላ</th>
+                <th style="padding: 6px; text-align: center;">ተሸጧል</th>
+                <th style="padding: 6px; text-align: right;">አጠቃላይ</th>
+            </tr>
+        </thead>
+        <tbody id="itemSummaryTableBody">
+            <tr>
+                <td colspan="5" style="padding: 8px; text-align: center; color: #64748b;">እባክዎ ባለቤት ይምረጡ</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<p style="font-size: 14px; margin: 6px 0;">💰 ጠቅላላ የሽያጭ መጠን (የተሸጠ/አጠቃላይ): <b id="totalSales" style="color: black;">0 / 0 ETB</b></p>
+<p style="font-size: 14px; margin: 6px 0;">💵 ጠቅላላ የተሸጠ/የተከፈለ ገቢ: <b id="totalPaidSales">0 / 0 ETB</b></p>
+<p style="font-size: 14px; margin: 6px 0;">📤 ለባለቤት የተላከ/የገባ: <b id="totalPaidToOwner">0 / 0 ETB</b></p>
+<p style="font-size: 14px; margin: 6px 0;">📌 ቀሪ (Balance): <b id="balance" style="color: red;">0 ETB</b></p>
 </div>
 
 <div class="card">
@@ -85,7 +106,7 @@ document.getElementById("paymentOwner").addEventListener("change", calculateBala
 function calculateBalance() {
     let owner = document.getElementById("paymentOwner").value;
     if (owner == "") {
-        document.getElementById("totalItemsCount").innerHTML = "0 / 0";
+        document.getElementById("itemSummaryTableBody").innerHTML = `<tr><td colspan="5" style="padding: 8px; text-align: center; color: #64748b;">እባክዎ ባለቤት ይምረጡ</td></tr>`;
         document.getElementById("totalSales").innerHTML = "0 / 0 ETB";
         document.getElementById("totalPaidSales").innerHTML = "0 / 0 ETB";
         document.getElementById("totalPaidToOwner").innerHTML = "0 / 0 ETB";
@@ -96,33 +117,49 @@ function calculateBalance() {
     db.ref("products").once("value", (productsSnapshot) => {
         db.ref("sales").once("value", (salesSnapshot) => {
             
-            let ownerTotalItems = 0;
             let ownerTotalPotentialPrice = 0;
-            let ownerSoldItems = 0;
             let ownerSoldAmount = 0;
+            let tableRowsHTML = "";
+            let hasProducts = false;
 
             productsSnapshot.forEach((pItem) => {
+                let pId = pItem.key;
                 let pData = pItem.val();
+                
                 if (pData.owner && owner && pData.owner.trim() == owner.trim()) {
+                    hasProducts = true;
                     let unitPrice = Number(pData.price || 0);
                     let currentStock = Number(pData.stock || 0);
                     
                     let itemSoldQty = 0;
                     salesSnapshot.forEach((sItem) => {
                         let sData = sItem.val();
-                        if (sData.product === pData.name && sData.owner && sData.owner.trim() == owner.trim()) {
+                        if (sData.productId === pId) {
                             itemSoldQty += Number(sData.quantity || 1);
                         }
                     });
 
                     let totalItemQty = currentStock + itemSoldQty;
-                    ownerTotalItems += totalItemQty;
-                    ownerTotalPotentialPrice += (totalItemQty * unitPrice);
-
-                    ownerSoldItems += itemSoldQty;
+                    let itemPotentialTotal = totalItemQty * unitPrice;
+                    
+                    ownerTotalPotentialPrice += itemPotentialTotal;
                     ownerSoldAmount += (itemSoldQty * unitPrice);
+
+                    tableRowsHTML += `
+                        <tr style="border-bottom: 1px solid #e2e8f0;">
+                            <td style="padding: 6px; font-weight: bold; text-align: right;">${pData.name || 'እቃ'}</td>
+                            <td style="padding: 6px; text-align: center;">${unitPrice}</td>
+                            <td style="padding: 6px; text-align: center; color: #0369a1; font-weight: bold;">${currentStock} / ${totalItemQty}</td>
+                            <td style="padding: 6px; text-align: center;">${itemSoldQty}</td>
+                            <td style="padding: 6px; text-align: right;">${itemPotentialTotal}</td>
+                        </tr>
+                    `;
                 }
             });
+
+            if (!hasProducts) {
+                tableRowsHTML = `<tr><td colspan="5" style="padding: 8px; text-align: center; color: #64748b;">ይህ ባለቤት የተመዘገበ እቃ የለውም</td></tr>`;
+            }
 
             db.ref("payments").once("value", (paySnap) => {
                 let totalPaidToOwnerAmount = 0;
@@ -138,28 +175,16 @@ function calculateBalance() {
                     }
                 });
 
-                let itemsDisplay = `${ownerSoldItems} / ${ownerTotalItems}`;
                 let salesDisplay = `${ownerSoldAmount} / ${ownerTotalPotentialPrice} ETB`;
-                let paidSalesDisplay = `${totalPaidSalesRecorded} / ${ownerTotalPotentialPrice} ETB`;
+                let paidSalesDisplay = `${totalPaidSalesRecorded} / ${ownerSoldAmount} ETB`;
                 let ownerPaidDisplay = `${totalPaidToOwnerAmount} / ${ownerSoldAmount} ETB`;
                 let remainingBalance = ownerSoldAmount - totalPaidToOwnerAmount;
 
-                let itemsElement = document.getElementById("totalItemsCount");
-                let salesElement = document.getElementById("totalSales");
-
-                itemsElement.innerHTML = itemsDisplay;
-                salesElement.innerHTML = salesDisplay;
+                document.getElementById("itemSummaryTableBody").innerHTML = tableRowsHTML;
+                document.getElementById("totalSales").innerHTML = salesDisplay;
                 document.getElementById("totalPaidSales").innerHTML = paidSalesDisplay;
                 document.getElementById("totalPaidToOwner").innerHTML = ownerPaidDisplay;
                 document.getElementById("balance").innerHTML = remainingBalance + " ETB";
-
-                if (ownerTotalItems > 0 && ownerSoldItems >= ownerTotalItems) {
-                    itemsElement.style.color = "red";
-                    salesElement.style.color = "red";
-                } else {
-                    itemsElement.style.color = "blue";
-                    salesElement.style.color = "black";
-                }
             });
         });
     });
