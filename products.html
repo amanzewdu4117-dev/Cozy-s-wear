@@ -7,11 +7,64 @@
 
 <link rel="stylesheet" href="style.css">
 
-<!-- PWA Manifest (ለአፕሊኬሽን አገልግሎት የተጨመረ) -->
+<!-- PWA Manifest -->
 <link rel="manifest" href="manifest.json">
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+
+<style>
+.table-container {
+    width: 100%;
+    overflow-x: auto;
+}
+table.product-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+    background-color: #fff;
+    border-radius: 6px;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+table.product-table th, table.product-table td {
+    padding: 8px 10px;
+    text-align: right;
+    border-bottom: 1px solid #eee;
+    font-size: 13px;
+}
+table.product-table th {
+    background-color: #f8fafc;
+    color: #334155;
+    font-weight: bold;
+    font-size: 13px;
+}
+table.product-table tr:hover {
+    background-color: #f1f5f9;
+}
+.stock-badge {
+    background-color: #e0f2fe;
+    color: #0369a1;
+    padding: 3px 8px;
+    border-radius: 10px;
+    font-weight: bold;
+    font-size: 12px;
+    white-space: nowrap;
+}
+.delete-btn {
+    background-color: #ef4444;
+    color: white;
+    padding: 4px 8px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 11px;
+    transition: background-color 0.2s;
+}
+.delete-btn:hover {
+    background-color: #dc2626;
+}
+</style>
 </head>
 
 <body>
@@ -21,12 +74,10 @@
 <p>የእቃዎች አስተዳደር እና መመዝገቢያ</p>
 </header>
 
-<!-- ⬅️ Back በተን (ወደ ዋናው ገጽ ለመመለስ) -->
 <div>
 <a href="index.html" class="back-btn">⬅️ Back</a>
 </div>
 
-<!-- እቃ መመዝገቢያ (በተኑ ሲነካ ፓስወርድ ይጠይቃል) -->
 <div class="card">
 <h3>አዲስ እቃ መመዝገቢያ</h3>
 <select id="productOwner">
@@ -40,16 +91,30 @@
 
 <div class="card">
 <h2>የእቃዎች ዝርዝር (Products List)</h2>
-<ul id="productList"></ul>
+<div class="table-container">
+    <table class="product-table">
+        <thead>
+            <tr>
+                <th>ባለቤት</th>
+                <th>የእቃው ስም</th>
+                <th>ዋጋ</th>
+                <th>ቀሪ / ጠቅላላ</th>
+                <th>የተመዘገበበት ቀን</th>
+                <th>እርምጃ</th>
+            </tr>
+        </thead>
+        <tbody id="productTableBody">
+        </tbody>
+    </table>
+</div>
 </div>
 
 <script src="firebase.js"></script>
 
 <script>
 const db = firebase.database();
-const ADMIN_PASSWORD = "aman"; // እዚህ ጋር የአድሚን ፓስወርድዎን መቀየር ይችላሉ
+const ADMIN_PASSWORD = "aman";
 
-// ባለቤቶችን (Owners) ከፋየርቤስ አምጥቶ በ Dropdown ውስጥ መሙላት
 db.ref("owners").on("value", (snapshot) => {
     let options = '<option value="">-- ባለቤት ይምረጡ --</option>';
     snapshot.forEach((item) => {
@@ -59,7 +124,6 @@ db.ref("owners").on("value", (snapshot) => {
     document.getElementById("productOwner").innerHTML = options;
 });
 
-// 🔐 አድሚን ፓስወርድ ማረጋገጫ ለ Add Product
 function checkPasswordAndAdd() {
     let pass = prompt("🔐 እቃ ለመመዝገብ የአድሚን ፓስወርድ ያስገቡ፦");
     if (pass === ADMIN_PASSWORD) {
@@ -92,11 +156,15 @@ function addProduct() {
         return;
     }
 
+    let parsedStock = Number(stock);
+
+    // እቃው ሲመዘገብ totalStock እና stock በአንድ ላይ ይያዛሉ
     db.ref("products").push({
         owner: owner,
         name: name,
         price: Number(price),
-        stock: Number(stock),
+        stock: parsedStock,
+        totalStock: parsedStock, 
         date: new Date().toLocaleString()
     });
 
@@ -106,7 +174,6 @@ function addProduct() {
     alert("✅ እቃው በተሳካ ሁኔታ ተመዝግቧል!");
 }
 
-// 🔐 አድሚን ፓስወርድ ማረጋገጫ ለ Delete Product
 function checkPasswordAndDelete(productId) {
     let pass = prompt("🔐 ይህንን እቃ ለማጥፋት የአድሚን ፓስወርድ ያስገቡ፦");
     if (pass === ADMIN_PASSWORD) {
@@ -126,25 +193,32 @@ function deleteProduct(productId) {
     }
 }
 
-// የእቃዎች ዝርዝር ማሳያ (ከነ Delete በተን ጋር)
 db.ref("products").on("value", (snapshot) => {
-    let listHTML = "";
+    let tableHTML = "";
 
     snapshot.forEach((item) => {
         let productId = item.key;
         let data = item.val();
+        
+        let currentStock = data.stock;
+        // totalStock ከሌለ (አሮጌ እቃ ከሆነ) የመጀመሪያውን ስቶክ በራሱ እንዲይዝ ይደረጋል
+        let totalStock = data.totalStock !== undefined ? data.totalStock : data.stock;
 
-        listHTML += `
-            <li style="margin-bottom: 10px;">
-                👤 ባለቤት: <b>${data.owner}</b><br>
-                📦 እቃ: <b>${data.name}</b> | ዋጋ: <b>${data.price} ETB</b> | ቀሪ ብዛት: <b>${data.stock}</b><br>
-                <small style="color:gray;">${data.date || ''}</small><br>
-                <button onclick="checkPasswordAndDelete('${productId}')" style="background-color: #d9534f; color: white; padding: 2px 6px; border: none; border-radius: 3px; cursor: pointer; font-size: 12px; margin-top: 4px;">🗑️ Delete</button>
-            </li><hr>
+        tableHTML += `
+            <tr>
+                <td><b>${data.owner}</b></td>
+                <td><b>${data.name}</b></td>
+                <td>${data.price} ETB</td>
+                <td><span class="stock-badge">${currentStock} ከ ${totalStock}</span></td>
+                <td><small style="color:gray;">${data.date || ''}</small></td>
+                <td>
+                    <button class="delete-btn" onclick="checkPasswordAndDelete('${productId}')">🗑️</button>
+                </td>
+            </tr>
         `;
     });
 
-    document.getElementById("productList").innerHTML = listHTML || "<li>ምንም የተመዘገበ እቃ የለም</li>";
+    document.getElementById("productTableBody").innerHTML = tableHTML || `<tr><td colspan="6" style="text-align:center;">ምንም የተመዘገበ እቃ የለም</td></tr>`;
 });
 </script>
 
